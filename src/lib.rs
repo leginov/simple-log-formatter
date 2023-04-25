@@ -3,6 +3,10 @@ use std::io::{self, Write};
 use env_logger::fmt::Formatter;
 use log::Record;
 
+#[cfg(feature = "json")]
+use serde::Serialize;
+
+#[cfg(feature = "simple")]
 #[inline]
 pub fn simple_formatter(formatter: &mut Formatter, record: &Record) -> io::Result<()> {
     writeln!(
@@ -12,6 +16,27 @@ pub fn simple_formatter(formatter: &mut Formatter, record: &Record) -> io::Resul
         record.module_path().unwrap_or_default(),
         record.args()
     )
+}
+
+#[cfg(feature = "json")]
+#[inline]
+pub fn json_formatter(formatter: &mut Formatter, record: &Record) -> io::Result<()> {
+    let entry = LogEntry {
+        level: record.level().to_string(),
+        msg: format!(
+            "[{}] {}",
+            record.module_path().unwrap_or_default(),
+            record.args()
+        ),
+    };
+    writeln!(formatter, "{}", serde_json::to_string(&entry)?)
+}
+
+#[cfg(feature = "json")]
+#[derive(Serialize)]
+struct LogEntry {
+    level: String,
+    msg: String,
 }
 
 #[cfg(test)]
@@ -39,6 +64,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "simple")]
     #[test]
     fn simple_log_format() {
         let (rx, tx) = channel();
@@ -47,13 +73,33 @@ mod tests {
             .target(Target::Pipe(Box::new(WriteAdapter { sender: rx })))
             .filter_level(log::LevelFilter::Debug)
             .format(simple_formatter)
-            //.is_test(true)
+            .is_test(true)
             .try_init();
 
         log::debug!("some debug log");
 
         assert_eq!(
             "DEBUG [simple_log_formatter::tests] some debug log\n",
+            String::from_utf8(tx.try_iter().collect()).unwrap()
+        );
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn json_log_format() {
+        let (rx, tx) = channel();
+
+        let _ = env_logger::builder()
+            .target(Target::Pipe(Box::new(WriteAdapter { sender: rx })))
+            .filter_level(log::LevelFilter::Debug)
+            .format(json_formatter)
+            .is_test(true)
+            .try_init();
+
+        log::debug!("some debug log");
+
+        assert_eq!(
+            "{\"level\":\"DEBUG\",\"msg\":\"[simple_log_formatter::tests] some debug log\"}\n",
             String::from_utf8(tx.try_iter().collect()).unwrap()
         );
     }
