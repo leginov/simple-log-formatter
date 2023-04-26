@@ -22,7 +22,7 @@ pub fn simple_formatter(formatter: &mut Formatter, record: &Record) -> io::Resul
 #[inline]
 pub fn json_formatter(formatter: &mut Formatter, record: &Record) -> io::Result<()> {
     let entry = LogEntry {
-        level: record.level().to_string(),
+        level: record.level().as_str(),
         msg: format!(
             "[{}] {}",
             record.module_path().unwrap_or_default(),
@@ -35,7 +35,7 @@ pub fn json_formatter(formatter: &mut Formatter, record: &Record) -> io::Result<
 #[cfg(feature = "json")]
 #[derive(Serialize)]
 struct LogEntry {
-    level: String,
+    level: &'static str,
     msg: String,
 }
 
